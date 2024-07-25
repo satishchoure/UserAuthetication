@@ -16,6 +16,8 @@ import com.example.UserAuthentication.IAuthService.IAuthService;
 import com.example.UserAuthentication.dto.LoginRequestDto;
 import com.example.UserAuthentication.dto.SignupRequestDto;
 import com.example.UserAuthentication.dto.UserDto;
+import com.example.UserAuthentication.dto.ValidateTokenRequestDto;
+import com.example.UserAuthentication.exception.InvalidException;
 import com.example.UserAuthentication.exception.UserAlreadyExistException;
 import com.example.UserAuthentication.exception.UserNotPresentException;
 import com.example.UserAuthentication.model.User;
@@ -71,7 +73,20 @@ public class AuthController {
 			e.printStackTrace();
 			return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
 		}
-		
+	}
+	
+	public ResponseEntity<Boolean> validateToken(@RequestBody ValidateTokenRequestDto validateTokenRequestDto){
+		try {
+			boolean isValidToken = authService.validateToken(validateTokenRequestDto);
+			if(!isValidToken) {
+				throw new InvalidException("Token Mismatch");
+			}
+			return new ResponseEntity(isValidToken, HttpStatus.OK);
+		}
+		catch(InvalidException ex){
+			ex.printStackTrace();
+			return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+		}
 	}
 
 	public UserDto from(User user) {

@@ -1,5 +1,6 @@
 package com.example.UserAuthentication.service;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -13,16 +14,21 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
 import com.example.UserAuthentication.IAuthService.IAuthService;
+import com.example.UserAuthentication.config.AuthConfiguration;
 import com.example.UserAuthentication.exception.UserNotPresentException;
+import com.example.UserAuthentication.exception.InvalidException;
 import com.example.UserAuthentication.exception.UserAlreadyExistException;
 import com.example.UserAuthentication.model.User;
 import com.example.UserAuthentication.repository.UserRepostiory;
+import com.example.UserAuthentication.dto.ValidateTokenRequestDto;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwt;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.MacAlgorithm;
 
-public class AuthService implements IAuthService {
+public class AuthService<ValidateTokenRequestDto> implements IAuthService {
 	
 	@Autowired
     private UserRepostiory userRepostiory;
@@ -31,6 +37,12 @@ public class AuthService implements IAuthService {
 	@Autowired 
 	private BCryptPasswordEncoder brcyptPasswordEncoder;
 	
+	
+	@Autowired
+	private AuthConfiguration authConfig;
+	
+	@Autowired
+	private SecretKey secret;
 	
 	@Override
 	public User signup(String email, String password) throws UserAlreadyExistException {
@@ -69,10 +81,7 @@ public class AuthService implements IAuthService {
 		userClaim.put("iat", System.currentTimeMillis()); //IAT -> IssuedAt
 		userClaim.put("expiry", System.currentTimeMillis()+ 1000000); //IAT -> IssuedAt
 		
-		//Create Secret Key from Mac Algo to sign the token.
-		MacAlgorithm signAlgo = Jwts.SIG.HS256;
-		SecretKey secret = signAlgo.key().build();
-		
+		/* Secret Key from Auth Config class */
 		//Create JWT Token
 		String token = Jwts.builder().setClaims(userClaim).signWith(secret).compact();
 		
@@ -80,5 +89,34 @@ public class AuthService implements IAuthService {
 		MultiValueMap<String, String> headers = new LinkedMultiValueMap<>();
 		
 		return new Pair<User, MultiValueMap<String, String>>(user, headers);
-	}	
+	}
+
+	@Override
+	public boolean validateToken(com.example.UserAuthentication.dto.ValidateTokenRequestDto validateTokenRequestDto)
+			throws InvalidException {
+		// TODO Auto-generated method stub
+		
+		JwtParser parser = Jwts.parser().verifyWith(secret).build();
+		Claims userPayolad= parser.parseSignedClaims("storeToken").getPayload();
+		long expritationTime = (long) userPayolad.get("expiry");
+		long currentTime = System.currentTimeMillis();
+		if(currentTime>expritationTime) {
+			return false;
+		}
+		
+		Optional<User> optionalUser = userRepostiory.findById(validateTokenRequestDto.getUserId());
+		if(optionalUser.isEmpty()) {
+			return false;
+		}
+		User user = optionalUser.get();
+		String userEmail = user.getEmail();
+		if(!userPayolad.get("Email").equals(userEmail)) {
+			System.out.println("email mismatch");
+			return false;
+		}
+		return true;
+	}
+
+
+
 }
